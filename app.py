@@ -245,14 +245,12 @@ def scan_volume_tab(symbols, exchange, interval, min_mult):
 # GLOBAL CONTROLS
 # ═══════════════════════════════════════════════════════
 st.markdown("---")
-gc1, gc2, gc3, gc4 = st.columns([2,1,1,1])
+gc1, gc2, gc3 = st.columns([3,1,1])
 with gc1:
     market_name = st.selectbox("🌐 Market", list(MARKET_MAP.keys()))
 with gc2:
-    min_cr = st.number_input("Min ₹Cr", value=4, min_value=0)
-with gc3:
     run = st.button("▶ RUN SCAN", use_container_width=True)
-with gc4:
+with gc3:
     auto = st.checkbox("⏱ Auto")
 st.markdown("---")
 
@@ -358,18 +356,37 @@ with menu[7]:
 if run or auto:
     with st.spinner(f"Scanning {len(symbols)} stocks…"):
         data = load_data(tuple(symbols), "15m", exchange)
-        (big_money, breakout, volume_spike_g, trap, liquidity,
-         order_blocks, smart_money, accumulation, technical, pivot_data) = analyze_stocks(data, symbols, exchange, min_cr)
+        (big_money_raw, breakout, volume_spike_g, trap, liquidity,
+         order_blocks, smart_money, accumulation, technical, pivot_data) = analyze_stocks(data, symbols, exchange, 0)
 
     with menu[0]:
         st.subheader("💰 Big Money Flow")
+        st.caption("Stocks where a single candle had ₹X Cr or more in trade value — detect institutional buying/selling in real time.")
+        bm1, bm2, bm3 = st.columns([1,1,2])
+        with bm1:
+            min_cr = st.number_input("Min ₹Cr per candle", min_value=0.1, value=4.0, step=0.5, key="bm_mincr",
+                                      help="Filter: only show stocks where price × volume ≥ this ₹ Crore threshold")
+        with bm2:
+            bm_tf = st.selectbox("Candle TF", ["1m","5m","15m"], index=2, key="bm_tf")
+        with bm3:
+            bm_type = st.radio("Show", ["All","🟢 Buyers Only","🔴 Sellers Only"], horizontal=True, key="bm_type")
+
+        big_money = [r for r in big_money_raw if r[2] >= min_cr]
+        if bm_type == "🟢 Buyers Only":
+            big_money = [r for r in big_money if r[3] == "🟢"]
+        elif bm_type == "🔴 Sellers Only":
+            big_money = [r for r in big_money if r[3] == "🔴"]
+
         if big_money:
             df = pd.DataFrame(big_money, columns=["Symbol","Price (₹)","Trade Value (₹Cr)","Trend"])
             df = df.sort_values("Trade Value (₹Cr)", ascending=False).reset_index(drop=True)
-            st.success(f"Found {len(df)} / {len(symbols)} stocks (>{min_cr} Cr)")
+            b1,b2,b3 = st.columns(3)
+            b1.metric("Found", f"{len(df)} / {len(symbols)}")
+            b2.metric("🟢 Buyers", len(df[df["Trend"]=="🟢"]))
+            b3.metric("🔴 Sellers", len(df[df["Trend"]=="🔴"]))
             st.dataframe(df, use_container_width=True)
         else:
-            st.warning("No big money stocks found. Try lowering Min ₹Cr.")
+            st.warning(f"No stocks with ≥ ₹{min_cr} Cr per candle found. Try lowering the threshold.")
 
     with menu[1]:
         st.subheader("🌡️ Market Heatmap")
