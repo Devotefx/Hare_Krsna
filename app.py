@@ -1,37 +1,39 @@
 import streamlit as st
 import yfinance as yf
-import time
 import pandas as pd
-import streamlit as st
+import time
 
-def tradingview_link(symbol):
-    clean_symbol = symbol.replace(".NS","")
-    url = f"https://www.tradingview.com/chart/?symbol=NSE:{clean_symbol}"
-    return f'<a href="{url}" target="_blank">{clean_symbol}</a>'
+st.set_page_config(page_title="Hare_Krsna", layout="wide")
+
 st.title("📊 Live Market Scanner")
 
-# Cache data to avoid repeated Yahoo calls
-@st.cache_data(ttl=300)
-def get_stock_data(symbol):
-    data = yf.download(symbol, period="5d", interval="15m")
-    return data
+# -------- SETTINGS --------
 
 stocks = [
     "RELIANCE.NS",
     "TCS.NS",
     "INFY.NS",
     "HDFCBANK.NS",
-    "ICICIBANK.NS",
+    "ICICIBANK.NS"
 ]
 
 breakouts = []
 volume_spikes = []
+big_money = []
+
+# -------- DATA CACHE --------
+
+@st.cache_data(ttl=300)
+def get_data(symbol):
+    return yf.download(symbol, period="5d", interval="15m")
+
+# -------- SCAN --------
 
 for s in stocks:
 
     try:
 
-        data = get_stock_data(s)
+        data = get_data(s)
 
         if len(data) < 20:
             continue
@@ -42,48 +44,55 @@ for s in stocks:
         volume = data["Volume"].iloc[-1]
         avg_volume = data["Volume"].rolling(20).mean().iloc[-2]
 
+        trade_value = price * volume
+
         if price > high20:
             breakouts.append(s)
 
         if volume > 3 * avg_volume:
             volume_spikes.append(s)
 
-        time.sleep(1)   # prevents rate limit
+        if trade_value > 50000000:
+            big_money.append(s)
 
-    except Exception as e:
+        time.sleep(1)
+
+    except:
         st.write(f"Error fetching {s}")
 
-import pandas as pd
+# -------- TRADINGVIEW LINK --------
 
-def tradingview_link(symbol):
-    clean_symbol = symbol.replace(".NS","")
-    url = f"https://www.tradingview.com/chart/?symbol=NSE:{clean_symbol}"
-    return f'<a href="{url}" target="_blank">{clean_symbol}</a>'
+def tv_link(symbol):
+    sym = symbol.replace(".NS","")
+    url = f"https://www.tradingview.com/chart/?symbol=NSE:{sym}"
+    return f'<a href="{url}" target="_blank">{sym}</a>'
+
+# -------- BUILD TABLE --------
 
 results = []
 
 for s in breakouts:
-    results.append({
-        "Symbol": tradingview_link(s),
-        "Signal": "Breakout"
-    })
+    results.append({"Symbol": tv_link(s), "Signal": "🚀 Breakout"})
 
 for s in volume_spikes:
-    results.append({
-        "Symbol": tradingview_link(s),
-        "Signal": "Volume Spike"
-    })
+    results.append({"Symbol": tv_link(s), "Signal": "🔥 Volume Spike"})
 
 for s in big_money:
-    results.append({
-        "Symbol": tradingview_link(s),
-        "Signal": "Big Money"
-    })
+    results.append({"Symbol": tv_link(s), "Signal": "💰 Big Money"})
 
 df = pd.DataFrame(results)
 
-st.markdown(
-    df.to_html(escape=False, index=False),
-    unsafe_allow_html=True
-)
+# -------- DISPLAY --------
 
+st.subheader("Scanner Results")
+
+if len(df) > 0:
+
+    st.markdown(
+        df.to_html(escape=False, index=False),
+        unsafe_allow_html=True
+    )
+
+else:
+
+    st.write("No signals detected.")
