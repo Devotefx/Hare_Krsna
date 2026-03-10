@@ -1,77 +1,98 @@
-from fastapi import FastAPI
-from fastapi.responses import FileResponse
+import streamlit as st
 import yfinance as yf
 import pandas as pd
+import time
 
-app = FastAPI()
+st.set_page_config(page_title="DevoteFX Scanner", layout="wide")
+
+st.title("📊 Live Market Scanner")
 
 # -------- STOCK LIST --------
 
-NIFTY50 = [
-"RELIANCE.NS","TCS.NS","INFY.NS","HDFCBANK.NS","ICICIBANK.NS",
-"HINDUNILVR.NS","SBIN.NS","LT.NS","AXISBANK.NS","KOTAKBANK.NS"
+stocks = [
+    "RELIANCE.NS",
+    "TCS.NS",
+    "INFY.NS",
+    "HDFCBANK.NS",
+    "ICICIBANK.NS"
 ]
 
-# -------- ROOT PAGE --------
+# -------- RESULT CONTAINERS --------
 
-@app.get("/")
-def root():
-    return FileResponse("index.html")
+breakouts = []
+volume_spikes = []
+big_money = []
+
+# -------- FETCH DATA --------
+
+@st.cache_data(ttl=300)
+def get_data(symbol):
+    try:
+        return yf.download(symbol, period="5d", interval="15m", progress=False)
+    except:
+        return None
 
 # -------- SCANNER --------
 
-@app.get("/api/scan/{mode}")
-def scan(mode: str, universe: str = "nifty50"):
+for s in stocks:
 
-    stocks = NIFTY50
+    data = get_data(s)
 
-    results = []
+    if data is None or len(data) < 20:
+        st.write(f"Error fetching {s}")
+        continue
 
-    for s in stocks:
+    price = data["Close"].iloc[-1]
+    high20 = data["High"].rolling(20).max().iloc[-2]
 
-        try:
+    volume = data["Volume"].iloc[-1]
+    avg_volume = data["Volume"].rolling(20).mean().iloc[-2]
 
-            data = yf.download(
-                s,
-                period="5d",
-                interval="15m",
-                progress=False
-            )
+    trade_value = price * volume
 
-            if len(data) < 20:
-                continue
+    if price > high20:
+        breakouts.append(s)
 
-            price = round(data["Close"].iloc[-1],2)
+    if volume > 3 * avg_volume:
+        volume_spikes.append(s)
 
-            volume = data["Volume"].iloc[-1]
+    if trade_value > 50000000:
+        big_money.append(s)
 
-            avg_vol = data["Volume"].rolling(20).mean().iloc[-2]
+    time.sleep(0.5)
 
-            trade_value = price * volume / 10000000
+# -------- TRADINGVIEW LINK --------
 
-            signal = "Neutral"
-            color = "green"
+def tv_link(symbol):
+    clean = symbol.replace(".NS","")
+    url = f"https://www.tradingview.com/chart/?symbol=NSE:{clean}"
+    return f'<a href="{url}" target="_blank">{clean}</a>'
 
-            if price > data["High"].rolling(20).max().iloc[-2]:
-                signal = "Breakout"
+# -------- BUILD RESULT TABLE --------
 
-            if volume > 3 * avg_vol:
-                signal = "Volume Spike"
+results = []
 
-            if trade_value > 5:
-                signal = "Big Money"
+for s in breakouts:
+    results.append({"Symbol": tv_link(s), "Signal": "🚀 Breakout"})
 
-            results.append({
+for s in volume_spikes:
+    results.append({"Symbol": tv_link(s), "Signal": "🔥 Volume Spike"})
 
-                "symbol": s.replace(".NS",""),
-                "price": price,
-                "trend": signal,
-                "signal_color": "green",
-                "value_cr": round(trade_value,2)
+for s in big_money:
+    results.append({"Symbol": tv_link(s), "Signal": "💰 Big Money"})
 
-            })
+df = pd.DataFrame(results)
 
-        except:
-            pass
+# -------- DISPLAY --------
 
-    return {"results": results}
+st.subheader("Scanner Results")
+
+if len(df) > 0:
+
+    st.markdown(
+        df.to_html(escape=False, index=False),
+        unsafe_allow_html=True
+    )
+
+else:
+    st.write("No signals detected.")
