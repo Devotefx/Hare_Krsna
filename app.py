@@ -53,9 +53,37 @@ for s in stocks:
     except Exception as e:
         st.write(f"Error fetching {s}")
 
-st.header("🚀 Breakouts")
-st.write(breakouts)
+import pandas as pd
 
-st.header("🔥 Volume Spikes")
-st.write(volume_spikes)
+def tradingview_link(symbol):
+    clean_symbol = symbol.replace(".NS","")
+    url = f"https://www.tradingview.com/chart/?symbol=NSE:{clean_symbol}"
+    return f'<a href="{url}" target="_blank">{clean_symbol}</a>'
+
+results = []
+
+for s in breakouts:
+    results.append({
+        "Symbol": tradingview_link(s),
+        "Signal": "Breakout"
+    })
+
+for s in volume_spikes:
+    results.append({
+        "Symbol": tradingview_link(s),
+        "Signal": "Volume Spike"
+    })
+
+for s in big_money:
+    results.append({
+        "Symbol": tradingview_link(s),
+        "Signal": "Big Money"
+    })
+
+df = pd.DataFrame(results)
+
+st.markdown(
+    df.to_html(escape=False, index=False),
+    unsafe_allow_html=True
+)
 
