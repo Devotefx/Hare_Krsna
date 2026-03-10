@@ -1,4 +1,3 @@
 streamlit
 yfinance
-python-binance
 pandas
