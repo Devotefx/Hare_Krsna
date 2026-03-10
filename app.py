@@ -1,7 +1,13 @@
 import streamlit as st
 import yfinance as yf
 import time
+import pandas as pd
+import streamlit as st
 
+def tradingview_link(symbol):
+    clean_symbol = symbol.replace(".NS","")
+    url = f"https://www.tradingview.com/chart/?symbol=NSE:{clean_symbol}"
+    return f'<a href="{url}" target="_blank">{clean_symbol}</a>'
 st.title("📊 Live Market Scanner")
 
 # Cache data to avoid repeated Yahoo calls
