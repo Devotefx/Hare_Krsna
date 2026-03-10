@@ -1,33 +1,69 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<title>Market Scanner</title>
+<meta charset="UTF-8"/><title>DevoteFX — Pro Trading Terminal</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;700&family=IBM+Plex+Mono&family=Cinzel:wght@400;600&display=swap" rel="stylesheet"/>
 <style>
-body{
-background:#111;
-color:white;
-font-family:Arial;
-text-align:center;
-margin-top:100px;
-}
-button{
-padding:20px;
-font-size:20px;
-background:#00ff88;
-border:none;
-cursor:pointer;
-}
+:root{--void:#080a0e;--bg:#0c0f16;--bg2:#111520;--gold:#c9a227;--gold2:#e8c55a;--text:#dce4f5;--text3:#4a5578;--green:#00d68f;--red:#ff4757;--mono:'IBM Plex Mono',monospace;}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:'Space Grotesk',sans-serif;overflow-x:hidden}
+.header{background:linear-gradient(90deg,var(--void),var(--bg2),var(--void));border-bottom:1px solid #1e2640;padding:0 20px;display:flex;align-items:center;justify-content:space-between;height:52px}
+.logo-mark{width:34px;height:34px;background:linear-gradient(135deg,var(--gold),#f5d97a);border-radius:7px;display:flex;align-items:center;justify-content:center;font-family:'Cinzel';color:var(--void);font-weight:600}
+.logo-name{font-family:'Cinzel';font-size:16px;font-weight:600;letter-spacing:2px;background:linear-gradient(90deg,var(--gold2),#f5d97a);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.tabs{background:var(--bg2);border-bottom:1px solid #1e2640;padding:0 20px;display:flex}
+.tab{padding:12px 15px;cursor:pointer;font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase}
+.tab.active{color:var(--gold2);border-bottom:2px solid var(--gold)}
+.controls{background:var(--bg2);border-bottom:1px solid #1e2640;padding:9px 20px;display:flex;align-items:center;gap:10px}
+select{background:#161c2a;border:1px solid #2a3354;color:var(--text);border-radius:5px;padding:5px;font-size:12px}
+.btn-run{background:linear-gradient(135deg,var(--gold),var(--gold2));color:var(--void);border:none;border-radius:5px;padding:6px 16px;font-size:11px;font-weight:700;cursor:pointer}
+table{width:100%;border-collapse:collapse}
+th{text-align:left;padding:10px;font-size:10px;color:var(--text3);border-bottom:1px solid #2a3354}
+td{padding:10px;font-size:12px;border-bottom:1px solid #1e2640}
+.sym{color:var(--gold2);font-weight:600;cursor:pointer;font-family:var(--mono)}
+.badge{padding:2px 7px;border-radius:4px;font-size:10px;font-weight:700;font-family:var(--mono)}
+.bg{background:rgba(0,214,143,.1);color:var(--green)}
+.br{background:rgba(255,71,87,.1);color:var(--red)}
 </style>
 </head>
-
 <body>
-
-<h1>📊 Market Scanner</h1>
-<p>NSE + Crypto Swing Scanner</p>
-
-<a href="https://hare-krsna.onrender.com">
-<button>Open Scanner</button>
-</a>
-
+<div class="header">
+  <div class="logo"><div class="logo-mark">ॐ</div><div class="logo-name">DEVOTEFX PRO</div></div>
+  <div id="mt" style="font-family:var(--mono);font-size:11px;color:var(--text3)"></div>
+</div>
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('bigmoney')">💰 Big Money</div>
+  <div class="tab" onclick="switchTab('technical')">📈 Technical</div>
+</div>
+<div class="controls">
+  <select id="market-select">
+    <optgroup label="NSE"><option value="nifty50">Nifty 50</option><option value="fno">All F&O</option></optgroup>
+    <optgroup label="BSE"><option value="bse_cash">BSE Cash</option></optgroup>
+    <optgroup label="MCX"><option value="mcx_comm">MCX Commodities</option></optgroup>
+  </select>
+  <button class="btn-run" onclick="runScan()">RUN PRO SCAN</button>
+</div>
+<div id="results" style="padding:20px"></div>
+<script>
+let currentTab = 'bigmoney';
+function openChart(sym) {
+  let exch = "NSE";
+  if(sym.includes("CRUDE") || sym.includes("GOLD") || sym.includes("SILVER")) exch = "MCX";
+  if(sym.includes("_BSE")) exch = "BSE";
+  window.open(`https://www.tradingview.com/chart/?symbol=${exch}:${sym.replace("_BSE","")}`, "_blank");
+}
+function switchTab(t){ currentTab=t; document.querySelectorAll('.tab').forEach(el=>el.classList.remove('active')); event.target.classList.add('active'); }
+async function runScan() {
+  const mkt = document.getElementById('market-select').value;
+  document.getElementById('results').innerHTML = '<div style="color:var(--gold)">Scanning...</div>';
+  const res = await fetch(`/api/scan/${currentTab}?universe=${mkt}`);
+  const data = await res.json();
+  let html = '<table><thead><tr><th>Symbol</th><th>Price</th><th>Signal</th><th>Detail</th></tr></thead><tbody>';
+  data.results.forEach(x => {
+    html += `<tr><td class="sym" onclick="openChart('${x.symbol}')">${x.symbol}</td><td>₹${x.price}</td><td><span class="badge ${x.signal_color==='red'?'br':'bg'}">${x.candle||x.trend}</span></td><td>${x.value_cr?x.value_cr+' Cr':x.rsi_zone||''}</td></tr>`;
+  });
+  document.getElementById('results').innerHTML = html + '</tbody></table>';
+}
+setInterval(()=>{const d=new Date(new Date().getTime()+19800000);document.getElementById('mt').innerHTML="IST: "+d.getUTCHours().toString().padStart(2,'0')+":"+d.getUTCMinutes().toString().padStart(2,'0')+":"+d.getUTCSeconds().toString().padStart(2,'0')},1000);
+</script>
 </body>
 </html>
