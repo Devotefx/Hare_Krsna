@@ -2,26 +2,56 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 
-st.set_page_config(page_title="DevoteFX Scanner", layout="wide")
+st.set_page_config(page_title="DevoteFX PRO", layout="wide")
 
-st.title("📊 Live Market Scanner")
+st.title("📊 DevoteFX PRO Market Scanner")
+
+# -------- MENU --------
+
+menu = st.tabs([
+"💰 Big Money",
+"🌡️ Heatmap",
+"🪤 Trap",
+"💧 Liquidity",
+"📦 Order Block",
+"💎 Smart Money",
+"📥 Accumulation",
+"📊 Volume",
+"📈 Technical",
+"🚀 Breakout",
+"🎯 Pivot"
+])
+
+# -------- CONTROLS --------
+
+col1,col2,col3,col4 = st.columns([2,1,1,1])
+
+with col1:
+    market = st.selectbox("Market",["Nifty 50"])
+
+with col2:
+    min_cr = st.number_input("Min ₹Cr",value=4)
+
+with col3:
+    run = st.button("▶ RUN SCAN")
+
+with col4:
+    auto = st.checkbox("⏱ Auto")
 
 # -------- STOCK LIST --------
 
 stocks = [
-    "RELIANCE.NS",
-    "TCS.NS",
-    "INFY.NS",
-    "HDFCBANK.NS",
-    "ICICIBANK.NS"
+"RELIANCE.NS","TCS.NS","INFY.NS",
+"HDFCBANK.NS","ICICIBANK.NS",
+"HINDUNILVR.NS","SBIN.NS","LT.NS"
 ]
 
-# -------- DOWNLOAD ALL DATA AT ONCE --------
+# -------- DOWNLOAD DATA --------
 
 @st.cache_data(ttl=300)
 def load_data():
 
-    data = yf.download(
+    return yf.download(
         tickers=stocks,
         period="5d",
         interval="15m",
@@ -29,81 +59,94 @@ def load_data():
         progress=False
     )
 
-    return data
+if run or auto:
 
-data = load_data()
+    data = load_data()
 
-breakouts = []
-volume_spikes = []
-big_money = []
+    big_money=[]
+    breakout=[]
+    volume_spike=[]
 
-# -------- SCAN --------
+    for s in stocks:
 
-for s in stocks:
+        try:
 
-    try:
+            df=data[s]
 
-        df = data[s]
+            price=df["Close"].iloc[-1]
+            volume=df["Volume"].iloc[-1]
+            avg=df["Volume"].rolling(20).mean().iloc[-2]
 
-        if len(df) < 20:
-            continue
+            trade_value=price*volume/10000000
 
-        price = df["Close"].iloc[-1]
-        high20 = df["High"].rolling(20).max().iloc[-2]
+            high20=df["High"].rolling(20).max().iloc[-2]
 
-        volume = df["Volume"].iloc[-1]
-        avg_volume = df["Volume"].rolling(20).mean().iloc[-2]
+            if trade_value>min_cr:
+                big_money.append([s.replace(".NS",""),price,round(trade_value,2)])
 
-        trade_value = price * volume
+            if price>high20:
+                breakout.append([s.replace(".NS",""),price])
 
-        if price > high20:
-            breakouts.append(s)
+            if volume>3*avg:
+                volume_spike.append([s.replace(".NS",""),volume])
 
-        if volume > 3 * avg_volume:
-            volume_spikes.append(s)
+        except:
+            pass
 
-        if trade_value > 50000000:
-            big_money.append(s)
+# -------- TAB CONTENT --------
 
-    except:
-        st.write(f"Data unavailable for {s}")
+with menu[0]:
 
-# -------- TRADINGVIEW LINK --------
+    st.subheader("💰 Big Money")
 
-def tv_link(symbol):
+    if run:
 
-    clean = symbol.replace(".NS","")
+        df=pd.DataFrame(big_money,columns=["Symbol","Price","₹ Cr"])
 
-    url = f"https://www.tradingview.com/chart/?symbol=NSE:{clean}"
+        st.dataframe(df)
 
-    return f'<a href="{url}" target="_blank">{clean}</a>'
+with menu[7]:
 
-# -------- BUILD TABLE --------
+    st.subheader("📊 Volume Spike")
 
-results = []
+    if run:
 
-for s in breakouts:
-    results.append({"Symbol": tv_link(s), "Signal": "🚀 Breakout"})
+        df=pd.DataFrame(volume_spike,columns=["Symbol","Volume"])
 
-for s in volume_spikes:
-    results.append({"Symbol": tv_link(s), "Signal": "🔥 Volume Spike"})
+        st.dataframe(df)
 
-for s in big_money:
-    results.append({"Symbol": tv_link(s), "Signal": "💰 Big Money"})
+with menu[9]:
 
-df = pd.DataFrame(results)
+    st.subheader("🚀 Breakouts")
 
-# -------- DISPLAY --------
+    if run:
 
-st.subheader("Scanner Results")
+        df=pd.DataFrame(breakout,columns=["Symbol","Price"])
 
-if len(df) > 0:
+        st.dataframe(df)
 
-    st.markdown(
-        df.to_html(escape=False, index=False),
-        unsafe_allow_html=True
-    )
+# -------- OTHER TABS --------
 
-else:
+with menu[1]:
+    st.info("Heatmap scanner coming soon")
 
-    st.write("No signals detected.")
+with menu[2]:
+    st.info("Trap detection coming soon")
+
+with menu[3]:
+    st.info("Liquidity zones coming soon")
+
+with menu[4]:
+    st.info("Order block detection coming soon")
+
+with menu[5]:
+    st.info("Smart money flow coming soon")
+
+with menu[6]:
+    st.info("Accumulation scanner coming soon")
+
+with menu[8]:
+    st.info("Technical indicators coming soon")
+
+with menu[10]:
+    st.info("Pivot scanner coming soon")
