@@ -1,31 +1,15 @@
 import streamlit as st
 import yfinance as yf
 from binance.client import Client
-import pandas as pd
+import time
 
-st.title("📊 Swing Trading Market Scanner")
+st.title("📊 Live Market Scanner")
 
-# ----------------------------
-# SETTINGS
-# ----------------------------
-
-big_money_threshold = st.sidebar.number_input(
-    "Big Money Threshold (₹ Crore)",
-    min_value=1,
-    max_value=100,
-    value=5
-)
-
-big_money_value = big_money_threshold * 10000000
-
-timeframe = st.sidebar.selectbox(
-    "Timeframe",
-    ["15m", "1h"]
-)
-
-# ----------------------------
-# STOCK LIST
-# ----------------------------
+# Cache data to avoid repeated Yahoo calls
+@st.cache_data(ttl=300)
+def get_stock_data(symbol):
+    data = yf.download(symbol, period="5d", interval="15m")
+    return data
 
 stocks = [
     "RELIANCE.NS",
@@ -33,41 +17,25 @@ stocks = [
     "INFY.NS",
     "HDFCBANK.NS",
     "ICICIBANK.NS",
-    "SBIN.NS",
-    "LT.NS",
-    "AXISBANK.NS"
 ]
 
 breakouts = []
 volume_spikes = []
-big_money = []
-
-# ----------------------------
-# SCANNER
-# ----------------------------
 
 for s in stocks:
 
     try:
 
-        data = yf.download(
-            s,
-            period="5d",
-            interval=timeframe
-        )
+        data = get_stock_data(s)
 
         if len(data) < 20:
             continue
 
         price = data["Close"].iloc[-1]
-
         high20 = data["High"].rolling(20).max().iloc[-2]
 
         volume = data["Volume"].iloc[-1]
-
         avg_volume = data["Volume"].rolling(20).mean().iloc[-2]
-
-        trade_value = price * volume
 
         if price > high20:
             breakouts.append(s)
@@ -75,41 +43,24 @@ for s in stocks:
         if volume > 3 * avg_volume:
             volume_spikes.append(s)
 
-        if trade_value > big_money_value:
-            big_money.append(s)
+        time.sleep(1)   # prevents rate limit
 
-    except:
-        pass
-
-# ----------------------------
-# RESULTS
-# ----------------------------
+    except Exception as e:
+        st.write(f"Error fetching {s}")
 
 st.header("🚀 Breakouts")
-
-for s in breakouts:
-    st.write(s)
+st.write(breakouts)
 
 st.header("🔥 Volume Spikes")
+st.write(volume_spikes)
 
-for s in volume_spikes:
-    st.write(s)
-
-st.header("💰 Big Money Trades")
-
-for s in big_money:
-    st.write(s)
-
-# ----------------------------
-# CRYPTO
-# ----------------------------
-
-st.header("₿ Crypto Market")
+# Crypto
+st.header("₿ Crypto")
 
 client = Client()
 
 btc = client.get_symbol_ticker(symbol="BTCUSDT")
 eth = client.get_symbol_ticker(symbol="ETHUSDT")
 
-st.write("BTC Price:", btc["price"])
-st.write("ETH Price:", eth["price"])
+st.write("BTC:", btc["price"])
+st.write("ETH:", eth["price"])
