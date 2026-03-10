@@ -1,6 +1,5 @@
 import streamlit as st
 import yfinance as yf
-from binance.client import Client
 import time
 
 st.title("📊 Live Market Scanner")
@@ -54,13 +53,3 @@ st.write(breakouts)
 st.header("🔥 Volume Spikes")
 st.write(volume_spikes)
 
-# Crypto
-st.header("₿ Crypto")
-
-client = Client()
-
-btc = client.get_symbol_ticker(symbol="BTCUSDT")
-eth = client.get_symbol_ticker(symbol="ETHUSDT")
-
-st.write("BTC:", btc["price"])
-st.write("ETH:", eth["price"])
