@@ -1,7 +1,6 @@
 import streamlit as st
 import yfinance as yf
 import pandas as pd
-import time
 
 st.set_page_config(page_title="DevoteFX Scanner", layout="wide")
 
@@ -17,58 +16,69 @@ stocks = [
     "ICICIBANK.NS"
 ]
 
-# -------- RESULT CONTAINERS --------
+# -------- DOWNLOAD ALL DATA AT ONCE --------
+
+@st.cache_data(ttl=300)
+def load_data():
+
+    data = yf.download(
+        tickers=stocks,
+        period="5d",
+        interval="15m",
+        group_by="ticker",
+        progress=False
+    )
+
+    return data
+
+data = load_data()
 
 breakouts = []
 volume_spikes = []
 big_money = []
 
-# -------- FETCH DATA --------
-
-@st.cache_data(ttl=300)
-def get_data(symbol):
-    try:
-        return yf.download(symbol, period="5d", interval="15m", progress=False)
-    except:
-        return None
-
-# -------- SCANNER --------
+# -------- SCAN --------
 
 for s in stocks:
 
-    data = get_data(s)
+    try:
 
-    if data is None or len(data) < 20:
-        st.write(f"Error fetching {s}")
-        continue
+        df = data[s]
 
-    price = data["Close"].iloc[-1]
-    high20 = data["High"].rolling(20).max().iloc[-2]
+        if len(df) < 20:
+            continue
 
-    volume = data["Volume"].iloc[-1]
-    avg_volume = data["Volume"].rolling(20).mean().iloc[-2]
+        price = df["Close"].iloc[-1]
+        high20 = df["High"].rolling(20).max().iloc[-2]
 
-    trade_value = price * volume
+        volume = df["Volume"].iloc[-1]
+        avg_volume = df["Volume"].rolling(20).mean().iloc[-2]
 
-    if price > high20:
-        breakouts.append(s)
+        trade_value = price * volume
 
-    if volume > 3 * avg_volume:
-        volume_spikes.append(s)
+        if price > high20:
+            breakouts.append(s)
 
-    if trade_value > 50000000:
-        big_money.append(s)
+        if volume > 3 * avg_volume:
+            volume_spikes.append(s)
 
-    time.sleep(0.5)
+        if trade_value > 50000000:
+            big_money.append(s)
+
+    except:
+        st.write(f"Data unavailable for {s}")
 
 # -------- TRADINGVIEW LINK --------
 
 def tv_link(symbol):
+
     clean = symbol.replace(".NS","")
+
     url = f"https://www.tradingview.com/chart/?symbol=NSE:{clean}"
+
     return f'<a href="{url}" target="_blank">{clean}</a>'
 
-# -------- BUILD RESULT TABLE --------
+# -------- BUILD TABLE --------
 
 results = []
 
@@ -95,4 +105,5 @@ if len(df) > 0:
     )
 
 else:
+
     st.write("No signals detected.")
