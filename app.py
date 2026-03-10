@@ -236,17 +236,69 @@ if run or auto:
     with menu[1]:
         st.subheader("🌡️ Market Heatmap")
         if technical:
-            df = pd.DataFrame(technical, columns=["Symbol", "Price", "EMA9", "EMA21", "RSI", "Signal"])
-            df["Color"] = df["Signal"].map({"BUY": "🟢", "SELL": "🔴", "HOLD": "🟡"})
-            buy   = df[df["Signal"] == "BUY"]
-            sell  = df[df["Signal"] == "SELL"]
-            hold  = df[df["Signal"] == "HOLD"]
+            # Build per-symbol pct change
+            heatmap_rows = []
+            for s in symbols:
+                try:
+                    closes = safe_get(data, s, "Close").dropna()
+                    if len(closes) < 2:
+                        continue
+                    price = float(closes.iloc[-1])
+                    prev  = float(closes.iloc[-2])
+                    pct   = (price - prev) / prev * 100
+                    heatmap_rows.append((s, price, pct))
+                except:
+                    continue
+            heatmap_rows.sort(key=lambda x: x[2], reverse=True)
+
+            def tile_color(pct):
+                if pct >= 3:    return "#0a5c2e", "#00e676"
+                elif pct >= 1.5: return "#145a32", "#69f0ae"
+                elif pct >= 0.5: return "#1e4d2b", "#a5d6a7"
+                elif pct >= 0:   return "#1b3a28", "#c8e6c9"
+                elif pct >= -0.5: return "#4a1010", "#ef9a9a"
+                elif pct >= -1.5: return "#6b1414", "#e57373"
+                elif pct >= -3:   return "#8b1a1a", "#f44336"
+                else:             return "#b71c1c", "#ff1744"
+
+            bulls = sum(1 for _, _, p in heatmap_rows if p >= 0)
+            bears = len(heatmap_rows) - bulls
             c1, c2, c3 = st.columns(3)
-            c1.metric("🟢 Bullish", len(buy))
-            c2.metric("🔴 Bearish", len(sell))
-            c3.metric("🟡 Neutral", len(hold))
-            st.markdown("**Signal Distribution**")
-            st.dataframe(df[["Symbol","Price","RSI","Signal","Color"]].sort_values("RSI"), use_container_width=True)
+            c1.metric("🟢 Advancing", bulls)
+            c2.metric("🔴 Declining", bears)
+            c3.metric("📊 Total", len(heatmap_rows))
+
+            # Render tile grid
+            tiles_html = """
+            <style>
+            .heatmap-grid {
+                display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 0;
+            }
+            .hm-tile {
+                width: 110px; min-height: 70px;
+                border-radius: 6px; padding: 8px 6px;
+                display: flex; flex-direction: column;
+                justify-content: center; align-items: center;
+                font-family: 'Segoe UI', sans-serif; cursor: default;
+                box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+            }
+            .hm-sym  { font-size: 11px; font-weight: 700; letter-spacing: 0.5px; }
+            .hm-pct  { font-size: 15px; font-weight: 800; margin: 2px 0; }
+            .hm-price{ font-size: 10px; opacity: 0.85; }
+            </style>
+            <div class="heatmap-grid">
+            """
+            for sym, price, pct in heatmap_rows:
+                bg, fg = tile_color(pct)
+                sign = "+" if pct >= 0 else ""
+                tiles_html += f"""
+                <div class="hm-tile" style="background:{bg}; color:{fg};">
+                    <div class="hm-sym">{sym}</div>
+                    <div class="hm-pct">{sign}{pct:.2f}%</div>
+                    <div class="hm-price">₹{price:,.1f}</div>
+                </div>"""
+            tiles_html += "</div>"
+            st.markdown(tiles_html, unsafe_allow_html=True)
         else:
             st.warning("Run scan to see heatmap.")
 
